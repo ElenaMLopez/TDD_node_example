@@ -47,7 +47,7 @@ module.exports = {
 };
 ```
 
-## Primer test
+## Primer test: El usuario tiene id = '1' (es Administrador)
 
 **Primer requerimiento**:
 
@@ -110,3 +110,144 @@ module.exports = (req, res, next) => {
   next();
 };
 ```
+
+---
+
+## Segundo test: Crear un post a nombre de otro usuario y lanzar error si el usuario no existe (la información viene el el body)
+
+Los siguientes requerimientos son
+
+> 2. Puede crear entradas a nombre de otro usuario.
+> 3. Si el usuario no existiese, ha de lanzar un error.
+> 4. El usuario ha de venir en el _body_ de la petición.
+
+Visitando la web de [jsonplaceholder](https://jsonplaceholder.typicode.com/), vemos que al traer los _posts_ o entradas, nos devuelve esto:
+
+```json
+[
+  {
+    "userId": 1,
+    "id": 1,
+    "title": "sunt aut facere repellat provident occaecati excepturi optio reprehenderit",
+    "body": "quia et suscipit\nsuscipit recusandae consequuntur expedita et cum\nreprehenderit molestiae ut ut quas totam\nnostrum rerum est autem sunt rem eveniet architecto"
+  },
+  {
+    "userId": 1,
+    "id": 2,
+    "title": "qui est esse",
+    "body": "est rerum tempore vitae\nsequi sint nihil reprehenderit dolor beatae ea dolores neque\nfugiat blanditiis voluptate porro vel nihil molestiae ut reiciendis\nqui aperiam non debitis possimus qui neque nisi nulla"
+  }
+  //muchas más con la misma estructura
+]
+```
+
+De esta forma ya sabemos que lo que ha de enviarse tiene los siguientes campos `userId, id, title, body`. En nuestro caso el `userId` será lo utilizado para saber si el usuario no existe, y por tanto lanzar el error. Toda la info ha de viajar en el `req.body` de la petición post.
+
+```js
+/**
+ * Para enviar: 
+ *   {
+    "userId": 1,
+    "id": 1,
+    "title": "Título",
+    "body": "Cuerpo del post"
+  },
+ */
+describe('Endpoints', () => {
+  describe('post', () => {
+    it.skip('Make a post', () => {
+      const mockUsers = [{ id: '1' }, { id: '2' }];
+      const mockPost = {
+        userId: 1,
+        id: 1,
+        title: 'Título',
+        body: 'Cuerpo del post',
+      };
+      const req = {
+        body: mockPost,
+      };
+      const res = {
+        status: jest.fn(),
+        send: jest.fn(),
+      };
+      const axios = {
+        get: jest.fn().mockResolveValue({ data: mockUsers }),
+        post: jest.fn(),
+      };
+    });
+  });
+});
+```
+
+Importamos el `postHandlers`, y realizamos las pruebas para confirmar el status de la llamada que ha de ser 201 (creado), para confirmar que el post se hace a la url de los post de json placeholder, y tambien que se realiza el get a la url. Por último se ha de realizar la prueba de que efectivamente se envía en la _data_ el id
+
+```js
+const postHandlers = require('./index');
+
+describe('Endpoints', () => {
+  describe('post', () => {
+    it.skip('Make a post', async () => {
+      const mockUsers = [{ id: '1' }, { id: '2' }];
+      const mockPost = {
+        userId: 1,
+        title: 'Título',
+        body: 'Cuerpo del post',
+      };
+      const req = {
+        body: mockPost,
+      };
+      const res = {
+        status: jest.fn(),
+        send: jest.fn(),
+      };
+      const axios = {
+        get: jest.fn().mockResolvedValue({ data: mockUsers }),
+        post: jest.fn().mockResolvedValue({ data: { id: 1000 } }),
+      };
+      await postHandlers({ axios }).post(req, res);
+      expect(res.status.mock.calls).toEqual([[201]]);
+      expect(res.send.mock.calls).toEqual([[{ id: 1000 }]]);
+      expect(axios.get.mock.calls).toEqual([
+        ['https://jsonplaceholder.typicode.com/users'],
+      ]);
+      // axios.post nos ha de devolver el id de la entrada creada
+      expect(axios.post.mock.calls).toEqual([
+        ['https://jsonplaceholder.typicode.com/posts', mockPost],
+      ]);
+    });
+  });
+});
+```
+
+A partir de esto, ya podemos construir el postHandler:
+
+`./endpoints/posts/index.js`
+
+```js
+// postHandlers
+module.exports = ({ axios }) => ({
+  post: async (req, res) => {
+    await axios.get('https://jsonplaceholder.typicode.com/users');
+    await axios.post('https://jsonplaceholder.typicode.com/posts', req.body);
+    res.status(201).send({ id: 1000 });
+  },
+});
+```
+
+Pero esto de momento es válido, porque estamos pasando un id que coincide con el que hay en el test, y esto no puede ser, puesto que si el id del test cambia, fallarán. Para solucionarlo, creamos la constante `{ data }` y esto será nuestro post en realidad:
+
+```js
+// postHandlers
+module.exports = ({ axios }) => ({
+  post: async (req, res) => {
+    await axios.get('https://jsonplaceholder.typicode.com/users');
+    const { data } = await axios.post(
+      'https://jsonplaceholder.typicode.com/posts',
+      req.body
+    );
+    res.status(201).send(data);
+  },
+});
+```
+
+### Manejando el caso de error: El id de usuario no existe.
