@@ -55,4 +55,58 @@ module.exports = {
 
 Teniendo en cuenta que el TDD se fundamenta en la realización de los test que se han de pasar ANTES del desarrollo del código mismo, lo primero es pensar que es necesario para gestionar los requirimientos solicitados. En este caso y puesto que _solo un Admin (que acordamos es el usuario que tendrá 'id = 1') puede crear una entrada_ lo primero que necesitaríamos sería un Middleware que realice esa comprobación y permita crear una entrada o no, según el id de un usuario. Este middleware será utilizado en el momento de hacer una petición _post_ en el `server.js`. Y creamos tanto la carpeta como el archivo del middleware que de momento está vacío. También creamos el archivo del test para el middleware.
 
-Sabemos que los middlewares van a recibir 3 parámetros en express, _req, res, next_ así pués, lo primero será mockear estos parámetros. Con la función _netx()_ lo que hacemos es determinar que se ejecute la siguiente función o middleware que haya. Por eso en este caso, si no es es Admin, pues no se ejecuta la llamada al _axios.post_.
+Sabemos que los middlewares van a recibir 3 parámetros en express, _req, res, next_ así pués, lo primero será mockear estos parámetros. Con la función _netx()_ lo que hacemos es determinar que se ejecute la siguiente función o middleware que haya. Por eso en este caso, si no es es Admin, pues no se ejecuta la llamada al _axios.post_:
+
+```js
+const authentication = require('./authentication');
+describe('Middlewares', () => {
+  describe('Authentication middleware', () => {
+    it('The user recived must have Id "1"', async () => {
+      const req = {
+        header: jest.fn().mockReturnValue('1'),
+      };
+      const res = {
+        sendStatus: jest.fn(),
+      }; // se usa sólo si hay error pero esto se hace en otro test. Ahora se conprueba sólo que no se llama.
+      const next = jest.fn();
+
+      await authentication(req, res, next);
+      expect(req.header.mock.calls).toEqual([
+        ['user_id'], // al no tener un array vacío se confirma que se llama una vez y tiene user_id en la cabecera.
+      ]);
+      expect(res.sendStatus.mock.calls).toEqual([]);
+      expect(next.mock.calls).toEqual([[]]); // El array con un array vacío es que se llama next() sin parámetros
+    });
+    // Gestión del error en caso de que el usuario que me llega en req no tiene user_id = 1
+    it('FAIL: User recibed don´t have user_id = 1 ', async () => {
+      const req = {
+        header: jest.fn().mockReturnValue('2'),
+      };
+      const res = {
+        sendStatus: jest.fn(),
+      }; // se usa sólo si hay error pero esto se hace en otro test. Ahora se conprueba sólo que no se llama.
+      const next = jest.fn();
+
+      await authentication(req, res, next);
+
+      expect(req.header.mock.calls).toEqual([['user_id']]);
+      expect(res.sendStatus.mock.calls).toEqual([[403]]);
+      expect(next.mock.calls).toEqual([]); // El array vacío, es que no se llama (no autorizado no hace el post)
+    });
+  });
+});
+```
+
+Según esto, al lanzar los test con Jest, van aa fallar todos, y lo que se hace es ir fallo a fallo resolviéndolo. para ello se ha de generar el contenido del archivo `./src/middlewares/aunthentication.js`:
+
+```js
+/* Recibiendo los tres parametros de un middleware el módulo exporta la comprobación de si el usuario tiene id = '1', y de no tenerla retorna una respuesta de status: 403 forbiden. En caso contrario se llama a next(), y en este caso se realizará la petición post */
+
+module.exports = (req, res, next) => {
+  const userId = req.header('user_id');
+  if (userId !== '1') {
+    return res.sendStatus(403);
+  }
+  next();
+};
+```
