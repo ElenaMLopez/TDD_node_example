@@ -1,5 +1,5 @@
-const users = require('./controllers');
+const posts = require('./endopoints');
 
 module.exports = {
-  users,
+  posts,
 };
