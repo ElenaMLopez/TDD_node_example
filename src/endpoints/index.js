@@ -1,5 +1,5 @@
 // postHandlers
-const posts = ({ axios }) => ({
+module.exports = ({ axios }) => ({
   post: async (req, res) => {
     const { data: users } = await axios.get(
       'https://jsonplaceholder.typicode.com/users'
@@ -19,7 +19,3 @@ const posts = ({ axios }) => ({
     return res.sendStatus(400);
   },
 });
-
-module.exports = {
-  posts,
-};
