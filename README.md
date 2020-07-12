@@ -40,7 +40,7 @@ app.listen(port, function () {
 `./src/index.js`
 
 ```js
-const posts = require('./endopoints');
+const posts = require('./endpoints');
 
 module.exports = {
   posts,
@@ -236,16 +236,18 @@ module.exports = ({ axios }) => ({
 
 Pero esto de momento es válido, porque estamos pasando un id que coincide con el que hay en el test, y esto no puede ser, puesto que si el id del test cambia, fallarán. Para solucionarlo, creamos la constante `{ data }` y esto será nuestro post en realidad:
 
+`/endpoints/post/index.js`
+
 ```js
-// postHandlers
 module.exports = ({ axios }) => ({
   post: async (req, res) => {
     await axios.get('https://jsonplaceholder.typicode.com/users');
     const { data } = await axios.post(
+      // Se crea { data }
       'https://jsonplaceholder.typicode.com/posts',
       req.body
     );
-    res.status(201).send(data);
+    res.status(201).send(data); // Se envía data
   },
 });
 ```

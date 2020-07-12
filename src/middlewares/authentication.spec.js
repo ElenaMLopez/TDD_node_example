@@ -1,4 +1,5 @@
 const authentication = require('./authentication');
+
 describe('Middlewares', () => {
   describe('Authentication middleware', () => {
     it('The user recived must have Id "1"', async () => {
@@ -11,6 +12,7 @@ describe('Middlewares', () => {
       const next = jest.fn();
 
       await authentication(req, res, next);
+
       expect(req.header.mock.calls).toEqual([['user_id']]);
       expect(res.sendStatus.mock.calls).toEqual([]);
       expect(next.mock.calls).toEqual([[]]);
