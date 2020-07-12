@@ -5,9 +5,6 @@ const posts = ({ axios }) => ({
       'https://jsonplaceholder.typicode.com/users'
     );
 
-    // console.log(users.find(x => console.log(x.id)));
-    // console.log('REQUEST BODY', req.body.userId);
-
     const found = users.find(x => x.id === req.body.userId);
 
     if (found) {
