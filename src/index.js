@@ -1,4 +1,5 @@
-const posts = require('./endpoints/post');
+const posts = require('./endpoints/index.js');
+console.log(posts);
 
 module.exports = {
   posts,
