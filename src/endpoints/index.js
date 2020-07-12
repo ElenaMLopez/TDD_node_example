@@ -16,7 +16,7 @@ const posts = ({ axios }) => ({
       return res.status(201).send(data);
     }
 
-    return res.sendStatus(404);
+    return res.sendStatus(400);
   },
 });
 

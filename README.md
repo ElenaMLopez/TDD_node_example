@@ -293,7 +293,7 @@ it('Should throw an error if the user to whom you want to assign a post don´t e
 });
 ```
 
-En este caso lo que queremos es confirmar que tenemos una respuesta de error (puede ser 500 o en este caso uso 404 porque el usuario no se encuentra en nuestro JSON recibido), y además confirmar que el middleware NO ejecuta el _axios.post_ tras este error:
+En este caso lo que queremos es confirmar que tenemos una respuesta de error (puede ser 500 o en este caso uso 400 porque el usuario no se encuentra en nuestro JSON recibido y sería un *Bad Request*), y además confirmar que el middleware NO ejecuta el _axios.post_ tras este error:
 
 ```js
 it('Should throw an error if the user to whom you want to assign a post don´t exist', async () => {
@@ -319,7 +319,7 @@ it('Should throw an error if the user to whom you want to assign a post don´t e
   await postHandlers({ axios }).post(req, res);
 
   expect(axios.post.mock.calls).toEqual([]); // Array vacío, no se llama a post
-  expect(res.sendStatus.mock.calls).toEqual([[404]]); // Envío de error 404 al cliente
+  expect(res.sendStatus.mock.calls).toEqual([[400]]); // Envío de error 400 al cliente
 });
 ```
 
@@ -346,7 +346,7 @@ Lo que debemos hacer es buscar en la _data_ que nos devuelve el _get_ a la url d
 
 Tras eso, podemos declarar una constante, que almacena un .find() de users, de forma que si tenemos un .id que coincide con _req.body.userId_ (que es lo que tenemos en el body del request como id de usuario) esta constante existe y tiene el valor del id, sin ser null, false o undefined. Y ya sobre esta gestionamos el caso de que sí exista el usuario y metemos el _axios.post_ y el _body_.
 
-Si esto nos devuelve un undefined (porque el usuario no existe), saltará directamente al envío de un status 404:
+Si esto nos devuelve un undefined (porque el usuario no existe), saltará directamente al envío de un status *400 Bad request* :
 
 `/endopoints/index.js`
 
@@ -368,7 +368,7 @@ const posts = ({ axios }) => ({
       return res.status(201).send(data);
     }
 
-    return res.sendStatus(404);
+    return res.sendStatus(400);
   },
 });
 
