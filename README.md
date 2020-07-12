@@ -221,7 +221,7 @@ describe('Endpoints', () => {
 
 A partir de esto, ya podemos construir el postHandler:
 
-`./endpoints/posts/index.js`
+`./endpoints/index.js`
 
 ```js
 // postHandlers
