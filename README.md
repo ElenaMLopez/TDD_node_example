@@ -2,8 +2,6 @@
 
 ---
 
----
-
 ## Análisis de requisitos
 
 Montaremos una API para un Blog usando TDD con las siguientes características:
@@ -13,7 +11,8 @@ Montaremos una API para un Blog usando TDD con las siguientes características:
 3. Si el usuario no existiese, ha de lanzar un error.
 4. El usuario ha de venir en el _body_ de la petición.
 
-Partiendo del ejercicio anterior, hay que cambiar la entidad de usuarios por la de _posts_:
+- Partiendo del ejercicio anterior, hay que cambiar la entidad de usuarios por la de _posts_.
+- Creamos también el archivo para el middleware y lo importamos en `server.js`, aunque de momento esté vacío
 
 `./server.js`
 
@@ -21,7 +20,10 @@ Partiendo del ejercicio anterior, hay que cambiar la entidad de usuarios por la 
 const express = require('express');
 const axios = require('axios');
 const bodyParser = require('body-parser');
-const { post } = require('./src');
+const { posts } = require('./src/endpoints');
+const { authentication } = require('./src/middlewares');
+console.log(typeof authentication);
+
 const port = 3000;
 const app = express();
 
@@ -29,8 +31,9 @@ app.use(bodyParser.urlencoded({ extended: false }));
 
 app.use(bodyParser.json());
 
-const postHandlers = post({ axios });
-app.post('/', postHandlers.post); // Solo haremos la parte de la creación
+const postsHandlers = posts({ axios });
+
+app.post('/', authentication, postsHandlers.post); // Solo haremos la parte de la creación
 
 app.listen(port, function () {
   console.log(`App listening on port ${port}!`);
@@ -59,6 +62,7 @@ Sabemos que los middlewares van a recibir 3 parámetros en express, _req, res, n
 
 ```js
 const authentication = require('./authentication');
+
 describe('Middlewares', () => {
   describe('Authentication middleware', () => {
     it('The user recived must have Id "1"', async () => {
@@ -236,7 +240,7 @@ module.exports = ({ axios }) => ({
 
 Pero esto de momento es válido, porque estamos pasando un id que coincide con el que hay en el test, y esto no puede ser, puesto que si el id del test cambia, fallarán. Para solucionarlo, creamos la constante `{ data }` y esto será nuestro post en realidad:
 
-`/endpoints/post/index.js`
+`/endpoints/index.js`
 
 ```js
 module.exports = ({ axios }) => ({
@@ -253,3 +257,122 @@ module.exports = ({ axios }) => ({
 ```
 
 ### Manejando el caso de error: El id de usuario no existe.
+
+Vamos a manejar la situación de que el Admin crea una entrada al blog y se la asigna a un usuario, y el id del usuario no existe.
+
+Comenzamos con el test, en el archivo `/endpoints/index.spec.js`, donde debajo del test de _Make a post_ pondemos el siguiente:
+
+```js
+it('Should throw an error if the user to whom you want to assign a post don´t exist', async () => {});
+```
+
+Empezamos realizando los mocks del test:
+
+```js
+it('Should throw an error if the user to whom you want to assign a post don´t exist', async () => {
+  const mockUsers = [{ id: '1' }, { id: '2' }];
+  const mockPost = {
+    userId: '3', // Colocamos un id que no existe en nuestro mock para que de error
+    title: 'Título',
+    body: 'Cuerpo del post',
+  };
+  const req = {
+    body: mockPost,
+  };
+  const res = {
+    status: jest.fn().mockReturnThis(),
+    send: jest.fn(),
+    sendStatus: jest.fn(),
+  };
+  const axios = {
+    get: jest.fn().mockResolvedValue({ data: mockUsers }),
+    post: jest.fn().mockResolvedValue({ data: { id: 1000 } }),
+  };
+
+  await postHandlers({ axios }).post(req, res); // Llamamos al handler
+});
+```
+
+En este caso lo que queremos es confirmar que tenemos una respuesta de error (puede ser 500 o en este caso uso 404 porque el usuario no se encuentra en nuestro JSON recibido), y además confirmar que el middleware NO ejecuta el _axios.post_ tras este error:
+
+```js
+it('Should throw an error if the user to whom you want to assign a post don´t exist', async () => {
+  const mockUsers = [{ id: '1' }, { id: '2' }];
+  const mockPost = {
+    userId: '3',
+    title: 'Título',
+    body: 'Cuerpo del post',
+  };
+  const req = {
+    body: mockPost,
+  };
+  const res = {
+    status: jest.fn().mockReturnThis(),
+    send: jest.fn(),
+    sendStatus: jest.fn(),
+  };
+  const axios = {
+    get: jest.fn().mockResolvedValue({ data: mockUsers }),
+    post: jest.fn().mockResolvedValue({ data: { id: 1000 } }),
+  };
+
+  await postHandlers({ axios }).post(req, res);
+
+  expect(axios.post.mock.calls).toEqual([]); // Array vacío, no se llama a post
+  expect(res.sendStatus.mock.calls).toEqual([[404]]); // Envío de error 404 al cliente
+});
+```
+
+Una vez hecho el test le llega el turno al postHandler:
+
+`/endopoints/index.js`
+
+```js
+module.exports = ({ axios }) => ({
+  post: async (req, res) => {
+    await axios.get('https://jsonplaceholder.typicode.com/users');
+    const { data } = await axios.post(
+      // Se crea { data }
+      'https://jsonplaceholder.typicode.com/posts',
+      req.body
+    );
+    res.status(201).send(data); // Se envía data
+  },
+});
+// De momento tan solo se hace un post pero no hay gestión del error de que el id de usuario no exista
+```
+
+Lo que debemos hacer es buscar en la _data_ que nos devuelve el _get_ a la url de usuarios de Jsonplaceholder y en caso de que no exista devolver un error. Esto lo podemos hacer con un find(). Para que sea más descriptivo, pasamos de _data_ a _users_ y almacenamos con un await lo que nos traiga el axios.get.
+
+Tras eso, podemos declarar una constante, que almacena un .find() de users, de forma que si tenemos un .id que coincide con _req.body.userId_ (que es lo que tenemos en el body del request como id de usuario) esta constante existe y tiene el valor del id, sin ser null, false o undefined. Y ya sobre esta gestionamos el caso de que sí exista el usuario y metemos el _axios.post_ y el _body_.
+
+Si esto nos devuelve un undefined (porque el usuario no existe), saltará directamente al envío de un status 404:
+
+`/endopoints/index.js`
+
+```js
+const posts = ({ axios }) => ({
+  post: async (req, res) => {
+    const { data: users } = await axios.get(
+      'https://jsonplaceholder.typicode.com/users'
+    );
+
+    const found = users.find(x => x.id === req.body.userId);
+
+    if (found) {
+      const { data } = await axios.post(
+        'https://jsonplaceholder.typicode.com/posts',
+        req.body
+      );
+
+      return res.status(201).send(data);
+    }
+
+    return res.sendStatus(404);
+  },
+});
+
+module.exports = {
+  posts,
+};
+```
