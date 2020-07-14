@@ -3,7 +3,6 @@ const axios = require('axios');
 const bodyParser = require('body-parser');
 const { posts } = require('./src/endpoints');
 const { authentication } = require('./src/middlewares');
-console.log(typeof authentication);
 
 const port = 3000;
 const app = express();
